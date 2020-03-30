@@ -32,7 +32,7 @@ type Mensaje struct {
 	Contenido       string
 }
 
-func enviarMensaje() {
+func enviarMensaje(c net.Conn) {
 	var texto string
 	fmt.Println("Mensaje : ")
 	fmt.Scanln(&texto)
@@ -54,22 +54,41 @@ func enviarMensaje() {
 			Mensaje:  Men,
 		}
 
-		fmt.Println(peticion)
+		//fmt.Println(peticion)
 
 		error = gob.NewEncoder(c).Encode(peticion)
 		if error != nil {
 			fmt.Println(error)
 		}
 
-		c.Close()
+		//c.Close()
 	}
 }
 
-func enviarArchivo() {
+func esperaMensajes(c net.Conn) {
+	for {
+		msm := Mensaje{
+			Id_conexion:     uint64(999),
+			Nombre_conexion: "",
+			Contenido:       "",
+		}
+
+		error := gob.NewDecoder(c).Decode(&msm)
+		if error != nil {
+			fmt.Println(error)
+		}
+		if msm.Id_conexion != 999 {
+			fmt.Println("mensaje entrante")
+			fmt.Println(msm)
+		}
+	}
+}
+
+func enviarArchivo(c net.Conn) {
 
 }
 
-func clienteFin() {
+func clienteFin(c net.Conn) {
 	fmt.Println("Salir")
 
 	c, error := net.Dial("tcp", ":9999")
@@ -89,22 +108,19 @@ func clienteFin() {
 			fmt.Println(error)
 		}
 
-		c.Close()
+		//c.Close()
 	}
 }
 
-func clienteInicio() {
+func clienteInicio(c net.Conn) {
 	var nombre string
 	fmt.Print("Cual es tu nombre : ")
 	fmt.Scanln(&nombre)
 
-	c, error := net.Dial("tcp", ":9999")
-
-	if error != nil {
-		fmt.Println(error)
+	if c == nil {
+		fmt.Println("Conexion no encontrada")
 	} else {
 		Con.Nombre = nombre
-		//Con.Con = c
 
 		peticion := Peticion{
 			Tipo:     "INICIO",
@@ -112,9 +128,7 @@ func clienteInicio() {
 			Mensaje:  Men,
 		}
 
-		fmt.Println(peticion)
-
-		error = gob.NewEncoder(c).Encode(peticion)
+		error := gob.NewEncoder(c).Encode(peticion)
 		if error != nil {
 			fmt.Println(error)
 		}
@@ -131,7 +145,7 @@ func clienteInicio() {
 			fmt.Println(error)
 		}
 
-		c.Close()
+		//c.Close()
 	}
 }
 
@@ -146,19 +160,28 @@ func menu() uint {
 }
 
 func main() {
-	clienteInicio()
+	c, error := net.Dial("tcp", ":9999")
 
-	for {
-		switch opcion := menu(); {
-		case opcion == uint(1):
-			enviarMensaje()
-		case opcion == uint(2):
-			enviarArchivo()
-		case opcion == uint(3):
-			clienteFin()
-			break
-		default:
-			fmt.Println("Opción no valida")
+	if error != nil {
+		fmt.Println(error)
+	} else {
+		clienteInicio(c)
+		go esperaMensajes(c)
+
+		for {
+			switch opcion := menu(); {
+			case opcion == uint(1):
+				enviarMensaje(c)
+			case opcion == uint(2):
+				enviarArchivo(c)
+			case opcion == uint(3):
+				clienteFin(c)
+				break
+			default:
+				fmt.Println("Opción no valida")
+			}
 		}
 	}
+
+	//c.Close()
 }

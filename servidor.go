@@ -7,6 +7,7 @@ import (
 	"net"
 )
 
+var lista_datos_conexiones list.List
 var lista_conexiones list.List
 var lista_mensajes list.List
 var indice uint64 = 0
@@ -41,6 +42,7 @@ func server() {
 			fmt.Println(error)
 			continue
 		}
+
 		go handleCliente(c)
 	}
 }
@@ -55,19 +57,21 @@ func handleCliente(c net.Conn) {
 	} else {
 		fmt.Println(Peticion)
 		if Peticion.Tipo == "INICIO" {
+			lista_conexiones.PushBack(c)
+
 			Peticion.Conexion.Id = indice
 
 			error = gob.NewEncoder(c).Encode(indice)
 			if error != nil {
 				fmt.Println(error)
 			} else {
-				lista_conexiones.PushBack(Peticion.Conexion)
+				lista_datos_conexiones.PushBack(Peticion.Conexion)
 				indice++
-				fmt.Println("Nuevo usuarios ", Peticion.Conexion.Nombre)
+				fmt.Println("Nuevo usuario ", Peticion.Conexion.Nombre)
 			}
 		} else if Peticion.Tipo == "FIN" {
 			fmt.Println("Cliente termino conexion")
-			for e := lista_conexiones.Front(); e != nil; e = e.Next() {
+			for e := lista_datos_conexiones.Front(); e != nil; e = e.Next() {
 				if e.Value.(*Conexion).Id == Peticion.Conexion.Id {
 					e.Value.(*Conexion).Activo = false
 				}
@@ -78,13 +82,20 @@ func handleCliente(c net.Conn) {
 
 			lista_mensajes.PushBack(Peticion.Mensaje)
 
+			for e := lista_conexiones.Front(); e != nil; e = e.Next() {
+				error = gob.NewEncoder(e.Value.(net.Conn)).Encode(Peticion.Mensaje)
+				if error != nil {
+					fmt.Println(error)
+				}
+				fmt.Println("mensaje enviado")
+			}
 		} else if Peticion.Tipo == "ARCHIVO" {
 			fmt.Println("Nuevo Archivo")
 
 		} else {
 			fmt.Println("Petición desconocida")
 		}
-		c.Close()
+		//c.Close()
 	}
 }
 
