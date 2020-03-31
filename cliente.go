@@ -7,8 +7,35 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
 )
+
+var clear map[string]func()
+
+func init() {
+	clear = make(map[string]func())
+	clear["linux"] = func() {
+		cmd := exec.Command("clear")
+		cmd.Stdout = os.Stdout
+		cmd.Run()
+	}
+	clear["windows"] = func() {
+		cmd := exec.Command("cmd", "/c", "cls")
+		cmd.Stdout = os.Stdout
+		cmd.Run()
+	}
+}
+
+func CallClear() {
+	value, ok := clear[runtime.GOOS]
+	if ok {
+		value()
+	} else {
+		panic("Error al limpiar pantalla")
+	}
+}
 
 var Con Conexion = Conexion{
 	Id:     999,
@@ -100,9 +127,16 @@ func esperaMensajes() {
 		}
 
 		if msm.Id_conexion != 999 {
-			fmt.Println("Nuevo Mensaje")
+			CallClear()
+
+			if msm.Id_conexion != Con.Id {
+				fmt.Println("( Nuevo Mensaje )")
+				fmt.Println(msm.Nombre_conexion, " : ", msm.Contenido)
+			}
+
+			menuTexto()
+
 			lista_mensajes.PushBack(msm)
-			muestraMensajes()
 		}
 	}
 }
@@ -130,8 +164,6 @@ func enviarArchivo() {
 }
 
 func clienteFin() {
-	fmt.Println("Salir")
-
 	c, error := net.Dial("tcp", ":9999")
 
 	if error != nil {
@@ -202,12 +234,21 @@ func clienteInicio() {
 	}
 }
 
+func menuTexto() {
+	fmt.Println("Opciónes")
+	fmt.Println("1- Enviar Mensaje")
+	fmt.Println("2- Enviar Archivo")
+	fmt.Println("3- Mostrar Mensajes")
+	fmt.Println("4- Salir")
+}
+
 func menu() uint {
 	var opcion = uint(0)
 	fmt.Println("Opciónes")
 	fmt.Println("1- Enviar Mensaje")
 	fmt.Println("2- Enviar Archivo")
-	fmt.Println("3- Salir")
+	fmt.Println("3- Mostrar Mensajes")
+	fmt.Println("4- Salir")
 	fmt.Scanln(&opcion)
 	return uint(opcion)
 }
@@ -217,17 +258,31 @@ func main() {
 	clienteInicio()
 
 	for {
+		CallClear()
 		switch opcion := menu(); {
 		case opcion == uint(1):
+			CallClear()
+			fmt.Println(" --- Enviar mensaje --- ")
 			enviarMensaje()
 		case opcion == uint(2):
+			CallClear()
+			fmt.Println(" --- Enviar archivo --- ")
 			enviarArchivo()
 		case opcion == uint(3):
+			CallClear()
+			fmt.Println(" --- Mostrar mensajes --- ")
+			muestraMensajes()
+		case opcion == uint(4):
+			CallClear()
+			fmt.Println(" --- Salir --- ")
 			clienteFin()
 			return
 			break
 		default:
 			fmt.Println("Opción no valida")
 		}
+		var pausa = ""
+		fmt.Println("Presione una tecla y enter para continuar ")
+		fmt.Scanln(&pausa)
 	}
 }
