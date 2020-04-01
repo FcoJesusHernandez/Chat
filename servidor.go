@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+	"time"
 )
 
 var clear map[string]func()
@@ -40,6 +41,7 @@ func CallClear() {
 var lista_datos_conexiones list.List
 var lista_conexiones list.List
 var lista_mensajes list.List
+var lista_archivos list.List
 var lista_peticiones list.List
 
 var indice uint64 = 1
@@ -48,6 +50,7 @@ type Peticion struct {
 	Tipo     string
 	Conexion Conexion
 	Mensaje  Mensaje
+	Archivo  File
 }
 
 type Conexion struct {
@@ -60,6 +63,18 @@ type Mensaje struct {
 	Id_conexion     uint64
 	Nombre_conexion string
 	Contenido       string
+}
+
+type File struct {
+	Id_conexion    uint64
+	Nombre_archivo string
+	Datos          []byte
+}
+
+type File_respaldo struct {
+	Id_conexion             uint64
+	Nombre_archivo_original string
+	Nombre_adaptado         string
 }
 
 func server() {
@@ -84,6 +99,7 @@ func handleCliente(c net.Conn) {
 	var Peticion Peticion
 
 	error := gob.NewDecoder(c).Decode(&Peticion)
+	//fmt.Println(Peticion)
 	if error != nil {
 		fmt.Println(error)
 	} else {
@@ -141,8 +157,26 @@ func handleCliente(c net.Conn) {
 				}
 			}
 		} else if Peticion.Tipo == "ARCHIVO" {
-			fmt.Println("Nuevo Archivo")
+			nombre_archivo := time.Now().Format("2006-01-02_15_04_05") + "_" + Peticion.Archivo.Nombre_archivo
+			file, error := os.Create(nombre_archivo) // retorna el puntero al archivo y si hubiera un error
+			if error != nil {
+				fmt.Println("No se pudo crear el archivo")
+				fmt.Println(error)
+				return
+			}
+			defer file.Close()
+			file.Write(Peticion.Archivo.Datos)
 
+			new_archivo := File_respaldo{
+				Id_conexion:             Peticion.Conexion.Id,
+				Nombre_archivo_original: Peticion.Archivo.Nombre_archivo,
+				Nombre_adaptado:         nombre_archivo,
+			}
+			lista_archivos.PushBack(new_archivo)
+
+			CallClear()
+			mostrarPeticiones()
+			menuTexto()
 		} else {
 			fmt.Println("Petición desconocida")
 		}
@@ -179,7 +213,7 @@ func mostrarPeticiones() {
 		} else if e.Value.(Peticion).Tipo == "MENSAJE" {
 			fmt.Println("Mensaje - ", e.Value.(Peticion).Mensaje.Nombre_conexion, " : ", e.Value.(Peticion).Mensaje.Contenido)
 		} else if e.Value.(Peticion).Tipo == "ARCHIVO" {
-			fmt.Println("Archivo - ")
+			fmt.Println("Archivo - ", e.Value.(Peticion).Archivo.Nombre_archivo)
 		} else {
 			fmt.Println("Petición desconocida - ")
 		}
@@ -233,8 +267,6 @@ func cargarMensajes() {
 	terminado1 := false
 
 	for i := 0; i < len(data); i++ {
-		fmt.Println(i)
-		fmt.Println(string(s[i]))
 		if s[i] != '\n' {
 			if !terminado1 {
 				if s[i] == '|' {
@@ -257,14 +289,84 @@ func cargarMensajes() {
 			mensaje = ""
 			terminado1 = false
 		}
-
 	}
+}
+
+func respaldarArchivos() {
+	os.Remove("archivos.txt")
+
+	file, error := os.Create("archivos.txt")
+	if error != nil {
+		fmt.Println("No se pudo crear el archivo")
+		return
+	}
+
+	for e := lista_archivos.Front(); e != nil; e = e.Next() {
+		file.WriteString(e.Value.(File_respaldo).Nombre_archivo_original + " | " + e.Value.(File_respaldo).Nombre_adaptado + " \n")
+	}
+
+	file.Close()
+}
+
+func cargarArchivos() {
+	data, error := ioutil.ReadFile("archivos.txt")
+	if error != nil {
+		fmt.Println("No se puede leer el archivo")
+		return
+	}
+	s := string(data)
+
+	nombre_archivo_original, nombre_adaptado := "", ""
+	terminado1 := false
+
+	for i := 0; i < len(data); i++ {
+		if s[i] != '\n' {
+			if !terminado1 {
+				if s[i] == '|' {
+					terminado1 = true
+					continue
+				}
+				nombre_archivo_original = nombre_archivo_original + string(s[i])
+			} else {
+				nombre_adaptado = nombre_adaptado + string(s[i])
+			}
+		} else {
+
+			archivo := File_respaldo{
+				Id_conexion:             uint64(999),
+				Nombre_archivo_original: nombre_archivo_original,
+				Nombre_adaptado:         nombre_adaptado,
+			}
+			lista_archivos.PushBack(archivo)
+
+			nombre_archivo_original = ""
+			nombre_adaptado = ""
+			terminado1 = false
+		}
+	}
+}
+
+func mostrarArchivos() {
+	fmt.Println("Archivos")
+	fmt.Println("-------------------------------------")
+	fmt.Println("")
+	for e := lista_archivos.Front(); e != nil; e = e.Next() {
+		origen := ""
+		if e.Value.(File_respaldo).Id_conexion == 999 {
+			origen = " ( Archivado )"
+		}
+
+		fmt.Println(e.Value.(File_respaldo).Nombre_archivo_original, origen, " renombrado como : ", e.Value.(File_respaldo).Nombre_adaptado)
+	}
+	fmt.Println("")
+	fmt.Println("-------------------------------------")
+	fmt.Println("")
 }
 
 func main() {
 	go server()
 	cargarMensajes()
-	//cargarArchivos()
+	cargarArchivos()
 	for {
 		CallClear()
 		mostrarPeticiones()
@@ -272,15 +374,15 @@ func main() {
 		case opcion == uint(1):
 			CallClear()
 			mostrarMensajes()
-			//mostrarArchivos()
+			mostrarArchivos()
 		case opcion == uint(2):
 			CallClear()
 			respaldarMensajes()
-			//respaldarArchivos()
+			respaldarArchivos()
 		case opcion == uint(3):
 			CallClear()
 			respaldarMensajes()
-			//respaldarArchivos()
+			respaldarArchivos()
 			//salir()
 			return
 			break

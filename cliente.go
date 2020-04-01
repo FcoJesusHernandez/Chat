@@ -50,6 +50,7 @@ type Peticion struct {
 	Tipo     string
 	Conexion Conexion
 	Mensaje  Mensaje
+	Archivo  File
 }
 
 type Conexion struct {
@@ -62,6 +63,12 @@ type Mensaje struct {
 	Id_conexion     uint64
 	Nombre_conexion string
 	Contenido       string
+}
+
+type File struct {
+	Id_conexion    uint64
+	Nombre_archivo string
+	Datos          []byte
 }
 
 func enviarMensaje() {
@@ -154,13 +161,53 @@ func muestraMensajes() {
 }
 
 func enviarArchivo() {
-	/*c, error := net.Dial("tcp", ":9999")
-
+	c, error := net.Dial("tcp", ":9999")
 	if error != nil {
 		fmt.Println(error)
 	} else {
 
-	}*/
+		var nombre_archivo string
+
+		fmt.Println("Nombre del archivo : ")
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			nombre_archivo = scanner.Text()
+		}
+
+		file, error := os.Open(nombre_archivo)
+		if error != nil {
+			fmt.Println(error)
+		}
+
+		stat, error := file.Stat() // regresa las propiedades, estadisticas del archivo, como la cantidad de bytes
+		if error != nil {
+			fmt.Println("No se puede leer las propiedades del archivo")
+			return
+		}
+
+		b := make([]byte, stat.Size()) // recervar memoria para el archivo
+		file.Read(b)
+
+		archivo := File{
+			Id_conexion:    Con.Id,
+			Nombre_archivo: nombre_archivo,
+			Datos:          b,
+		}
+
+		peticion := Peticion{
+			Tipo:     "ARCHIVO",
+			Conexion: Con,
+			Mensaje:  Men,
+			Archivo:  archivo,
+		}
+
+		error = gob.NewEncoder(c).Encode(peticion)
+		if error != nil {
+			fmt.Println(error)
+		}
+
+		c.Close()
+	}
 }
 
 func clienteFin() {
@@ -187,7 +234,6 @@ func clienteFin() {
 
 func clienteInicio() {
 	c, error := net.Dial("tcp", ":9999")
-
 	if error != nil {
 		fmt.Println(error)
 	} else {
