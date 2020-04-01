@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+	"time"
 )
 
 var clear map[string]func()
@@ -71,6 +72,12 @@ type File struct {
 	Datos          []byte
 }
 
+type Peticion_clientes struct {
+	Tipo    string
+	Mensaje Mensaje
+	Archivo File
+}
+
 func enviarMensaje() {
 	var texto string
 
@@ -117,33 +124,72 @@ func esperaMensajes() {
 		return
 	}
 	for {
-		msm := Mensaje{
-			Id_conexion:     uint64(999),
-			Nombre_conexion: "",
-			Contenido:       "",
-		}
 		c, error := s.Accept() //cuando acepte la conexion llamara al manejador
 		if error != nil {
 			fmt.Println(error)
 			continue
 		}
 
-		error2 := gob.NewDecoder(c).Decode(&msm)
+		peticion := Peticion_clientes{
+			Tipo:    "NULO",
+			Mensaje: nil,
+			Archivo: nil,
+		}
+
+		error2 := gob.NewDecoder(c).Decode(&peticion)
 		if error2 != nil {
 			fmt.Println(error2)
 		}
 
-		if msm.Id_conexion != 999 {
-			CallClear()
-
-			if msm.Id_conexion != Con.Id {
-				fmt.Println("( Nuevo Mensaje )")
-				fmt.Println(msm.Nombre_conexion, " : ", msm.Contenido)
+		if peticion.Tipo == "MENSAJE" {
+			msm := Mensaje{
+				Id_conexion:     uint64(999),
+				Nombre_conexion: "",
+				Contenido:       "",
 			}
 
-			menuTexto()
+			msm = peticion.Mensaje
+			if msm.Id_conexion != 999 {
+				CallClear()
 
-			lista_mensajes.PushBack(msm)
+				if msm.Id_conexion != Con.Id {
+					fmt.Println("( Nuevo Mensaje )")
+					fmt.Println(msm.Nombre_conexion, " : ", msm.Contenido)
+				}
+
+				menuTexto()
+				MENSAJE
+				ARCHIVO
+				lista_mensajes.PushBack(msm)
+			}
+		} else if peticion.Tipo == "ARCHIVO" {
+			file := File{
+				Id_conexion:    uint64(999),
+				Nombre_archivo: "",
+				Datos:          nil,
+			}
+
+			file = peticion.Archivo
+			if file.Id_conexion != 999 {
+				CallClear()
+
+				if file.Id_conexion != Con.Id {
+					fmt.Println("( Nuevo Archivo )")
+					fmt.Println(file.Nombre_archivo)
+
+					nombre_archivo := "CLIENTE_" + Con.Nombre + "_" + time.Now().Format("2006-01-02_15_04_05") + "_" + file.Nombre_archivo
+					file, error := os.Create(nombre_archivo) // retorna el puntero al archivo y si hubiera un error
+					if error != nil {
+						fmt.Println("No se pudo crear el archivo")
+						fmt.Println(error)
+						return
+					}
+					defer file.Close()
+					file.Write(file.Datos)
+				}
+
+				menuTexto()
+			}
 		}
 	}
 }

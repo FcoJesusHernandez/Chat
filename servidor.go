@@ -77,6 +77,12 @@ type File_respaldo struct {
 	Nombre_adaptado         string
 }
 
+type Peticion_clientes struct {
+	Tipo    string
+	Mensaje Mensaje
+	Archivo File
+}
+
 func server() {
 	s, error := net.Listen("tcp", ":9999") // c = conexion escuchando en el puerto
 	if error != nil {
@@ -137,6 +143,12 @@ func handleCliente(c net.Conn) {
 			menuTexto()
 			gob.NewEncoder(c).Encode(Peticion)
 
+			Peticion_para_cliente := Peticion_clientes{
+				Tipo:    "MENSAJE",
+				Mensaje: Peticion.Mensaje,
+				Archivo: nil,
+			}
+
 			for e := lista_datos_conexiones.Front(); e != nil; e = e.Next() {
 				if e.Value.(Conexion).Activo == true {
 					puerto := "990" + strconv.FormatUint(e.Value.(Conexion).Id, 10)
@@ -146,7 +158,7 @@ func handleCliente(c net.Conn) {
 					if error != nil {
 						fmt.Println(error)
 					} else {
-						error2 := gob.NewEncoder(c2).Encode(Peticion.Mensaje)
+						error2 := gob.NewEncoder(c2).Encode(Peticion_para_cliente)
 						if error2 != nil {
 							fmt.Println(error2)
 							lista_datos_conexiones.Remove(e)
@@ -157,7 +169,7 @@ func handleCliente(c net.Conn) {
 				}
 			}
 		} else if Peticion.Tipo == "ARCHIVO" {
-			nombre_archivo := time.Now().Format("2006-01-02_15_04_05") + "_" + Peticion.Archivo.Nombre_archivo
+			nombre_archivo := "S_" + time.Now().Format("2006-01-02_15_04_05") + "_" + Peticion.Archivo.Nombre_archivo
 			file, error := os.Create(nombre_archivo) // retorna el puntero al archivo y si hubiera un error
 			if error != nil {
 				fmt.Println("No se pudo crear el archivo")
@@ -174,6 +186,31 @@ func handleCliente(c net.Conn) {
 			}
 			lista_archivos.PushBack(new_archivo)
 
+			Peticion_para_cliente := Peticion_clientes{
+				Tipo:    "ARCHIVO",
+				Mensaje: nil,
+				Archivo: Peticion.Archivo,
+			}
+
+			for e := lista_datos_conexiones.Front(); e != nil; e = e.Next() {
+				if e.Value.(Conexion).Activo == true {
+					puerto := "990" + strconv.FormatUint(e.Value.(Conexion).Id, 10)
+
+					c2, error := net.Dial("tcp", ":"+puerto)
+
+					if error != nil {
+						fmt.Println(error)
+					} else {
+						error2 := gob.NewEncoder(c2).Encode(Peticion_para_cliente)
+						if error2 != nil {
+							fmt.Println(error2)
+							lista_datos_conexiones.Remove(e)
+						} else {
+							//fmt.Println("Mensaje enviado")
+						}
+					}
+				}
+			}
 			CallClear()
 			mostrarPeticiones()
 			menuTexto()
