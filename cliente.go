@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+	"time"
 )
 
 var clear map[string]func()
@@ -50,6 +51,7 @@ type Peticion struct {
 	Tipo     string
 	Conexion Conexion
 	Mensaje  Mensaje
+	Archivo  File
 }
 
 type Conexion struct {
@@ -62,6 +64,18 @@ type Mensaje struct {
 	Id_conexion     uint64
 	Nombre_conexion string
 	Contenido       string
+}
+
+type File struct {
+	Id_conexion    uint64
+	Nombre_archivo string
+	Datos          []byte
+}
+
+type Peticion_clientes struct {
+	Tipo    string
+	Mensaje Mensaje
+	Archivo File
 }
 
 func enviarMensaje() {
@@ -110,33 +124,68 @@ func esperaMensajes() {
 		return
 	}
 	for {
-		msm := Mensaje{
-			Id_conexion:     uint64(999),
-			Nombre_conexion: "",
-			Contenido:       "",
-		}
 		c, error := s.Accept() //cuando acepte la conexion llamara al manejador
 		if error != nil {
 			fmt.Println(error)
 			continue
 		}
 
-		error2 := gob.NewDecoder(c).Decode(&msm)
+		peticion := Peticion_clientes{
+			Tipo: "NULO",
+			//Mensaje: nil,
+			//Archivo: nil,
+		}
+
+		error2 := gob.NewDecoder(c).Decode(&peticion)
 		if error2 != nil {
 			fmt.Println(error2)
 		}
 
-		if msm.Id_conexion != 999 {
-			CallClear()
-
-			if msm.Id_conexion != Con.Id {
-				fmt.Println("( Nuevo Mensaje )")
-				fmt.Println(msm.Nombre_conexion, " : ", msm.Contenido)
+		if peticion.Tipo == "MENSAJE" {
+			msm := Mensaje{
+				Id_conexion:     uint64(999),
+				Nombre_conexion: "",
+				Contenido:       "",
 			}
 
-			menuTexto()
+			msm = peticion.Mensaje
+			if msm.Id_conexion != 999 {
+				CallClear()
 
-			lista_mensajes.PushBack(msm)
+				if msm.Id_conexion != Con.Id {
+					fmt.Println("( Nuevo Mensaje ", msm.Nombre_conexion, " : ", msm.Contenido, " ) ")
+				}
+
+				menuTexto()
+				lista_mensajes.PushBack(msm)
+			}
+		} else if peticion.Tipo == "ARCHIVO" {
+			file := File{
+				Id_conexion:    uint64(999),
+				Nombre_archivo: "",
+				Datos:          nil,
+			}
+
+			file = peticion.Archivo
+			if file.Id_conexion != 999 {
+				CallClear()
+
+				if file.Id_conexion != Con.Id {
+					fmt.Println("( Nuevo Archivo - ", file.Nombre_archivo, " )")
+
+					nombre_archivo := "docs/CLIENTE_" + Con.Nombre + "_" + time.Now().Format("2006-01-02_15_04_05") + "_" + file.Nombre_archivo
+					file2, error := os.Create(nombre_archivo) // retorna el puntero al archivo y si hubiera un error
+					if error != nil {
+						fmt.Println("No se pudo crear el archivo")
+						fmt.Println(error)
+						return
+					}
+					defer file2.Close()
+					file2.Write(file.Datos)
+				}
+
+				menuTexto()
+			}
 		}
 	}
 }
@@ -154,13 +203,53 @@ func muestraMensajes() {
 }
 
 func enviarArchivo() {
-	/*c, error := net.Dial("tcp", ":9999")
-
+	c, error := net.Dial("tcp", ":9999")
 	if error != nil {
 		fmt.Println(error)
 	} else {
 
-	}*/
+		var nombre_archivo string
+
+		fmt.Println("Nombre del archivo : ")
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			nombre_archivo = scanner.Text()
+		}
+
+		file, error := os.Open(nombre_archivo)
+		if error != nil {
+			fmt.Println(error)
+		}
+
+		stat, error := file.Stat() // regresa las propiedades, estadisticas del archivo, como la cantidad de bytes
+		if error != nil {
+			fmt.Println("No se puede leer las propiedades del archivo")
+			return
+		}
+
+		b := make([]byte, stat.Size()) // recervar memoria para el archivo
+		file.Read(b)
+
+		archivo := File{
+			Id_conexion:    Con.Id,
+			Nombre_archivo: nombre_archivo,
+			Datos:          b,
+		}
+
+		peticion := Peticion{
+			Tipo:     "ARCHIVO",
+			Conexion: Con,
+			Mensaje:  Men,
+			Archivo:  archivo,
+		}
+
+		error = gob.NewEncoder(c).Encode(peticion)
+		if error != nil {
+			fmt.Println(error)
+		}
+
+		c.Close()
+	}
 }
 
 func clienteFin() {
@@ -187,7 +276,6 @@ func clienteFin() {
 
 func clienteInicio() {
 	c, error := net.Dial("tcp", ":9999")
-
 	if error != nil {
 		fmt.Println(error)
 	} else {
