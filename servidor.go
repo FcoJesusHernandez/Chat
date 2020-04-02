@@ -146,7 +146,7 @@ func handleCliente(c net.Conn) {
 			Peticion_para_cliente := Peticion_clientes{
 				Tipo:    "MENSAJE",
 				Mensaje: Peticion.Mensaje,
-				Archivo: nil,
+				//Archivo: "",
 			}
 
 			for e := lista_datos_conexiones.Front(); e != nil; e = e.Next() {
@@ -169,7 +169,7 @@ func handleCliente(c net.Conn) {
 				}
 			}
 		} else if Peticion.Tipo == "ARCHIVO" {
-			nombre_archivo := "S_" + time.Now().Format("2006-01-02_15_04_05") + "_" + Peticion.Archivo.Nombre_archivo
+			nombre_archivo := "docs/SERVIDOR_" + time.Now().Format("2006-01-02_15_04_05") + "_" + Peticion.Archivo.Nombre_archivo
 			file, error := os.Create(nombre_archivo) // retorna el puntero al archivo y si hubiera un error
 			if error != nil {
 				fmt.Println("No se pudo crear el archivo")
@@ -187,8 +187,8 @@ func handleCliente(c net.Conn) {
 			lista_archivos.PushBack(new_archivo)
 
 			Peticion_para_cliente := Peticion_clientes{
-				Tipo:    "ARCHIVO",
-				Mensaje: nil,
+				Tipo: "ARCHIVO",
+				//Mensaje: nil,
 				Archivo: Peticion.Archivo,
 			}
 

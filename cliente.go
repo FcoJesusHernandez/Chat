@@ -131,9 +131,9 @@ func esperaMensajes() {
 		}
 
 		peticion := Peticion_clientes{
-			Tipo:    "NULO",
-			Mensaje: nil,
-			Archivo: nil,
+			Tipo: "NULO",
+			//Mensaje: nil,
+			//Archivo: nil,
 		}
 
 		error2 := gob.NewDecoder(c).Decode(&peticion)
@@ -153,13 +153,10 @@ func esperaMensajes() {
 				CallClear()
 
 				if msm.Id_conexion != Con.Id {
-					fmt.Println("( Nuevo Mensaje )")
-					fmt.Println(msm.Nombre_conexion, " : ", msm.Contenido)
+					fmt.Println("( Nuevo Mensaje ", msm.Nombre_conexion, " : ", msm.Contenido, " ) ")
 				}
 
 				menuTexto()
-				MENSAJE
-				ARCHIVO
 				lista_mensajes.PushBack(msm)
 			}
 		} else if peticion.Tipo == "ARCHIVO" {
@@ -174,18 +171,17 @@ func esperaMensajes() {
 				CallClear()
 
 				if file.Id_conexion != Con.Id {
-					fmt.Println("( Nuevo Archivo )")
-					fmt.Println(file.Nombre_archivo)
+					fmt.Println("( Nuevo Archivo - ", file.Nombre_archivo, " )")
 
-					nombre_archivo := "CLIENTE_" + Con.Nombre + "_" + time.Now().Format("2006-01-02_15_04_05") + "_" + file.Nombre_archivo
-					file, error := os.Create(nombre_archivo) // retorna el puntero al archivo y si hubiera un error
+					nombre_archivo := "docs/CLIENTE_" + Con.Nombre + "_" + time.Now().Format("2006-01-02_15_04_05") + "_" + file.Nombre_archivo
+					file2, error := os.Create(nombre_archivo) // retorna el puntero al archivo y si hubiera un error
 					if error != nil {
 						fmt.Println("No se pudo crear el archivo")
 						fmt.Println(error)
 						return
 					}
-					defer file.Close()
-					file.Write(file.Datos)
+					defer file2.Close()
+					file2.Write(file.Datos)
 				}
 
 				menuTexto()
